@@ -3,10 +3,10 @@ import { CreatePostDto } from './create-post.dto';
 
 export class UpdatePostDto extends PartialType(CreatePostDto) {}
 
-// src/modules/posts/dto/posts-query.dto.ts
-import { IsOptional, IsString, IsNumber, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsIn, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { PostStatus } from '../entities/post.entity';
 
 export class PostsQueryDto {
   @ApiProperty({ example: 1, required: false })
@@ -28,11 +28,20 @@ export class PostsQueryDto {
 
   @ApiProperty({ example: 'createdAt', required: false })
   @IsOptional()
-  @IsIn(['createdAt', 'title', 'views', 'likes', 'comments'])
+  @IsIn(['createdAt', 'title', 'views', 'likes', 'comments', 'publishedAt'])
   sortBy?: string = 'createdAt';
 
   @ApiProperty({ example: 'DESC', required: false })
   @IsOptional()
   @IsIn(['ASC', 'DESC'])
   sortOrder?: string = 'DESC';
+
+  @ApiProperty({
+    enum: PostStatus,
+    required: false,
+    description: 'Filter by post status',
+  })
+  @IsOptional()
+  @IsEnum(PostStatus)
+  status?: PostStatus;
 }

@@ -12,9 +12,16 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 
+export enum PostStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+}
+
 @Entity('posts')
 @Index('IDX_POST_AUTHOR', ['authorId'])
 @Index('IDX_POST_CREATED', ['createdAt'])
+@Index('IDX_POST_STATUS', ['status'])
+@Index('IDX_POST_AUTHOR_STATUS', ['authorId', 'status'])
 export class Post {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,6 +40,16 @@ export class Post {
 
   @Column({ default: 0 })
   likes: number;
+
+  @Column({
+    type: 'enum',
+    enum: PostStatus,
+    default: PostStatus.DRAFT,
+  })
+  status: PostStatus;
+
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  publishedAt?: Date;
 
   @ManyToOne(() => User, (user) => user.posts, { eager: true })
   @JoinColumn({ name: 'authorId' })

@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { PostStatus } from '../entities/post.entity';
 
 export class CreatePostDto {
   @ApiProperty({ example: 'My First Blog Post' })
@@ -16,4 +17,14 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @ApiProperty({ 
+    enum: PostStatus, 
+    example: PostStatus.DRAFT, 
+    required: false,
+    description: 'Post status - draft or published'
+  })
+  @IsOptional()
+  @IsEnum(PostStatus)
+  status?: PostStatus = PostStatus.DRAFT;
 }

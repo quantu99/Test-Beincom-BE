@@ -9,12 +9,17 @@ import {
   UseGuards,
   Request,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { CreateDraftDto } from './dto/create-draft.dto';
+import { PublishDraftDto, UpdateDraftDto } from './dto/update-draft.dto';
 import { PostsQueryDto, UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DraftsQueryDto } from './dto/draft-query.dto';
 
 @ApiTags('posts')
 @Controller('posts')
@@ -24,17 +29,76 @@ export class PostsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new post' })
+  @ApiOperation({ summary: 'Create a new post (can be draft or published)' })
   create(@Body() createPostDto: CreatePostDto, @Request() req) {
     return this.postsService.create(createPostDto, req.user.id);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all posts with pagination and search' })
+  @ApiOperation({ summary: 'Get all published posts with pagination and search' })
   findAll(@Query() query: PostsQueryDto) {
     return this.postsService.findAll(query);
   }
 
+  // Draft endpoints
+  @Post('drafts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new draft' })
+  createDraft(@Body() createDraftDto: CreateDraftDto, @Request() req) {
+    return this.postsService.createDraft(createDraftDto, req.user.id);
+  }
+
+  @Get('drafts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user drafts' })
+  getUserDrafts(@Query() query: DraftsQueryDto, @Request() req) {
+    return this.postsService.getUserDrafts(query, req.user.id);
+  }
+
+  @Get('drafts/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get draft by id' })
+  getDraft(@Param('id') id: string, @Request() req) {
+    return this.postsService.getDraft(id, req.user.id);
+  }
+
+  @Patch('drafts/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update draft' })
+  updateDraft(
+    @Param('id') id: string,
+    @Body() updateDraftDto: UpdateDraftDto,
+    @Request() req,
+  ) {
+    return this.postsService.updateDraft(id, updateDraftDto, req.user.id);
+  }
+
+  @Post('drafts/:id/publish')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Publish a draft' })
+  publishDraft(
+    @Param('id') id: string,
+    @Body() publishDraftDto: PublishDraftDto,
+    @Request() req,
+  ) {
+    return this.postsService.publishDraft(id, publishDraftDto, req.user.id);
+  }
+
+  @Delete('drafts/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete/Discard draft' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  discardDraft(@Param('id') id: string, @Request() req) {
+    return this.postsService.discardDraft(id, req.user.id);
+  }
+
+  // Existing endpoints
   @Get('popular')
   @ApiOperation({ summary: 'Get popular posts' })
   getPopular(@Query('limit') limit?: number) {
@@ -48,9 +112,7 @@ export class PostsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get post by id' })
+  @ApiOperation({ summary: 'Get published post by id' })
   findOne(@Param('id') id: string) {
     return this.postsService.findOne(id);
   }
@@ -58,9 +120,13 @@ export class PostsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update post' })
-  update(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
-    return this.postsService.update(id, updatePostDto);
+  @ApiOperation({ summary: 'Update published post' })
+  update(
+    @Param('id') id: string,
+    @Body() updatePostDto: UpdatePostDto,
+    @Request() req,
+  ) {
+    return this.postsService.update(id, updatePostDto, req.user.id);
   }
 
   @Post(':id/like')
@@ -74,8 +140,9 @@ export class PostsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete post' })
-  remove(@Param('id') id: string) {
-    return this.postsService.remove(id);
+  @ApiOperation({ summary: 'Delete published post' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id') id: string, @Request() req) {
+    return this.postsService.remove(id, req.user.id);
   }
 }
