@@ -12,6 +12,8 @@ import { CreateDraftDto } from './dto/create-draft.dto';
 import { PublishDraftDto, UpdateDraftDto } from './dto/update-draft.dto';
 import { PostsQueryDto, UpdatePostDto } from './dto/update-post.dto';
 import { DraftsQueryDto } from './dto/draft-query.dto';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 
 @Injectable()
 export class PostsService {
@@ -115,8 +117,15 @@ export class PostsService {
     authorId: string,
   ): Promise<Post> {
     const draft = await this.getDraft(id, authorId);
+    const oldImageUrl = draft.image;
 
     Object.assign(draft, updateDraftDto);
+    
+    // If image is being updated and there was an old image, delete the old one
+    if (updateDraftDto.image && oldImageUrl && oldImageUrl !== updateDraftDto.image) {
+      await this.deleteImageFile(oldImageUrl);
+    }
+
     return this.postsRepository.save(draft);
   }
 
@@ -126,11 +135,18 @@ export class PostsService {
     authorId: string,
   ): Promise<Post> {
     const draft = await this.getDraft(id, authorId);
+    const oldImageUrl = draft.image;
 
     // Update with any final changes before publishing
     if (publishDraftDto.title) draft.title = publishDraftDto.title;
     if (publishDraftDto.content) draft.content = publishDraftDto.content;
-    if (publishDraftDto.image) draft.image = publishDraftDto.image;
+    if (publishDraftDto.image) {
+      // If image is being updated, delete the old one
+      if (oldImageUrl && oldImageUrl !== publishDraftDto.image) {
+        await this.deleteImageFile(oldImageUrl);
+      }
+      draft.image = publishDraftDto.image;
+    }
 
     draft.status = PostStatus.PUBLISHED;
     draft.publishedAt = new Date();
@@ -140,7 +156,28 @@ export class PostsService {
 
   async discardDraft(id: string, authorId: string): Promise<void> {
     const draft = await this.getDraft(id, authorId);
+    
+    // Delete associated image if exists
+    if (draft.image) {
+      await this.deleteImageFile(draft.image);
+    }
+    
     await this.postsRepository.remove(draft);
+  }
+
+  // Helper method to delete image files
+  private async deleteImageFile(imageUrl: string): Promise<void> {
+    try {
+      // Extract filename from URL (assuming format like /api/posts/images/filename)
+      const filename = imageUrl.split('/').pop();
+      if (filename) {
+        const filePath = join(process.cwd(), 'uploads/posts', filename);
+        await unlink(filePath);
+      }
+    } catch (error) {
+      console.warn('Failed to delete image file:', error.message);
+      // Don't throw error as this is cleanup operation
+    }
   }
 
   // Updated existing methods
@@ -243,7 +280,15 @@ export class PostsService {
       throw new ForbiddenException('You can only update your own posts');
     }
 
+    const oldImageUrl = post.image;
+
     Object.assign(post, updatePostDto);
+
+    // If image is being updated and there was an old image, delete the old one
+    if (updatePostDto.image && oldImageUrl && oldImageUrl !== updatePostDto.image) {
+      await this.deleteImageFile(oldImageUrl);
+    }
+
     return this.postsRepository.save(post);
   }
 
@@ -261,6 +306,11 @@ export class PostsService {
 
     if (post.authorId !== authorId) {
       throw new ForbiddenException('You can only delete your own posts');
+    }
+
+    // Delete associated image if exists
+    if (post.image) {
+      await this.deleteImageFile(post.image);
     }
 
     await this.postsRepository.remove(post);

@@ -11,8 +11,15 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Response,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateDraftDto } from './dto/create-draft.dto';
@@ -20,6 +27,26 @@ import { PublishDraftDto, UpdateDraftDto } from './dto/update-draft.dto';
 import { PostsQueryDto, UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DraftsQueryDto } from './dto/draft-query.dto';
+
+// Multer configuration for image uploads
+const imageStorage = diskStorage({
+  destination: './uploads/posts',
+  filename: (req, file, callback) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = extname(file.originalname);
+    callback(null, `post-${uniqueSuffix}${ext}`);
+  },
+});
+
+const imageFileFilter = (req: any, file: any, callback: any) => {
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+    return callback(
+      new BadRequestException('Only image files are allowed!'),
+      false,
+    );
+  }
+  callback(null, true);
+};
 
 @ApiTags('posts')
 @Controller('posts')
@@ -32,6 +59,59 @@ export class PostsController {
   @ApiOperation({ summary: 'Create a new post (can be draft or published)' })
   create(@Body() createPostDto: CreatePostDto, @Request() req) {
     return this.postsService.create(createPostDto, req.user.id);
+  }
+
+  // Image upload endpoint
+  @Post('upload-image')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: imageStorage,
+      fileFilter: imageFileFilter,
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Image file upload',
+    type: 'multipart/form-data',
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Upload image for post' })
+  uploadImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Return the file URL that frontend can use
+    const imageUrl = `/api/posts/images/${file.filename}`;
+    
+    return {
+      message: 'Image uploaded successfully',
+      imageUrl,
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+    };
+  }
+
+  // Serve uploaded images
+  @Get('images/:filename')
+  @ApiOperation({ summary: 'Get uploaded image' })
+  getImage(@Param('filename') filename: string, @Request() req, @Response() res) {
+    const imagePath = join(process.cwd(), 'uploads/posts', filename);
+    return res.sendFile(imagePath);
   }
 
   @Get()
