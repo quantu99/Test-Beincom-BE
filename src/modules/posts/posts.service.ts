@@ -32,7 +32,6 @@ export class PostsService {
     return this.postsRepository.save(post);
   }
 
-  // Draft methods
   async createDraft(
     createDraftDto: CreateDraftDto,
     authorId: string,
