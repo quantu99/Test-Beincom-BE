@@ -16,7 +16,13 @@ import {
   BadRequestException,
   Response,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -89,14 +95,14 @@ export class PostsController {
     },
   })
   @ApiOperation({ summary: 'Upload image for post' })
-  uploadImage(@UploadedFile() file: any) {
+  uploadImage(@UploadedFile() file: any, @Request() req) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    // Return the file URL that frontend can use
-    const imageUrl = `/api/posts/images/${file.filename}`;
-    
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/api/posts/images/${file.filename}`;
+
     return {
       message: 'Image uploaded successfully',
       imageUrl,
@@ -109,13 +115,19 @@ export class PostsController {
   // Serve uploaded images
   @Get('images/:filename')
   @ApiOperation({ summary: 'Get uploaded image' })
-  getImage(@Param('filename') filename: string, @Request() req, @Response() res) {
+  getImage(
+    @Param('filename') filename: string,
+    @Request() req,
+    @Response() res,
+  ) {
     const imagePath = join(process.cwd(), 'uploads/posts', filename);
     return res.sendFile(imagePath);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all published posts with pagination and search' })
+  @ApiOperation({
+    summary: 'Get all published posts with pagination and search',
+  })
   findAll(@Query() query: PostsQueryDto) {
     return this.postsService.findAll(query);
   }

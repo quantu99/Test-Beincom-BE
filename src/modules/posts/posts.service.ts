@@ -164,10 +164,8 @@ export class PostsService {
     await this.postsRepository.remove(draft);
   }
 
-  // Helper method to delete image files
   private async deleteImageFile(imageUrl: string): Promise<void> {
     try {
-      // Extract filename from URL (assuming format like /api/posts/images/filename)
       const filename = imageUrl.split('/').pop();
       if (filename) {
         const filePath = join(process.cwd(), 'uploads/posts', filename);
@@ -175,11 +173,9 @@ export class PostsService {
       }
     } catch (error) {
       console.warn('Failed to delete image file:', error.message);
-      // Don't throw error as this is cleanup operation
     }
   }
 
-  // Updated existing methods
   async findAll(query: PostsQueryDto): Promise<{
     posts: Post[];
     total: number;
