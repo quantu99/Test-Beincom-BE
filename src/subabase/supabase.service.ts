@@ -7,8 +7,8 @@ export class SupabaseService {
 
   constructor() {
     this.client = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_KEY!,
+      process.env.SUPABASE_URL as string,
+      (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY) as string,
     );
   }
 

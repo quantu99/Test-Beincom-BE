@@ -23,8 +23,6 @@ import { SupabaseModule } from './subabase/subabase.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
-        console.log('Database URL:', databaseUrl); // Debug log
-
         return {
           type: 'postgres',
           url: databaseUrl,
