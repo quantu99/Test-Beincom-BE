@@ -4,25 +4,32 @@ import { MulterModule } from '@nestjs/platform-express';
 import { Post } from './entities/post.entity';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
 import { SupabaseModule } from '@/subabase/subabase.module';
-
-const uploadDir = join(process.cwd(), 'uploads/posts');
-if (!existsSync(uploadDir)) {
-  mkdirSync(uploadDir, { recursive: true });
-}
+import { memoryStorage } from 'multer';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Post]),
     MulterModule.register({
-      dest: './uploads/posts',
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
+      storage: memoryStorage(),
+      fileFilter: (req, file, callback) => {
+        const allowedTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/webp',
+          'image/gif',
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
     }),
     SupabaseModule,
   ],
