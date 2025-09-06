@@ -13,6 +13,7 @@ import { DatabaseModule } from './database/database.module';
 import { User } from './modules/users/entities/user.entity';
 import { Post } from './modules/posts/entities/post.entity';
 import { Comment } from './modules/comments/entities/comment.entity';
+import { SubabaseModule } from './subabase/subabase.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { Comment } from './modules/comments/entities/comment.entity';
     PostsModule,
     CommentsModule,
     DatabaseModule,
+    SubabaseModule,
   ],
 })
 export class AppModule {}

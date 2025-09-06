@@ -7,6 +7,7 @@ import { PostsController } from './posts.controller';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { SupabaseModule } from '@/subabase/subabase.module';
 
 const uploadDir = join(process.cwd(), 'uploads/posts');
 if (!existsSync(uploadDir)) {
@@ -23,6 +24,7 @@ if (!existsSync(uploadDir)) {
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    SupabaseModule,
   ],
   providers: [PostsService],
   controllers: [PostsController],
