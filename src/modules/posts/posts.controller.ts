@@ -96,7 +96,7 @@ export class PostsController {
   })
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file: Express.Multer.File) {
+  async upload(@UploadedFile() file: any) {
     return this.postsService.uploadImage(file);
   }
 
