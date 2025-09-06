@@ -89,7 +89,7 @@ export class PostsController {
     },
   })
   @ApiOperation({ summary: 'Upload image for post' })
-  uploadImage(@UploadedFile() file: Express.Multer.File) {
+  uploadImage(@UploadedFile() file: any) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
