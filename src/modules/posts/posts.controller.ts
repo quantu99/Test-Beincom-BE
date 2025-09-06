@@ -94,25 +94,12 @@ export class PostsController {
       },
     },
   })
-  @ApiOperation({ summary: 'Upload image for post' })
-  uploadImage(@UploadedFile() file: any, @Request() req) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
-    }
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/api/posts/images/${file.filename}`;
-
-    return {
-      message: 'Image uploaded successfully',
-      imageUrl,
-      filename: file.filename,
-      originalName: file.originalname,
-      size: file.size,
-    };
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async upload(@UploadedFile() file: Express.Multer.File) {
+    return this.postsService.uploadImage(file);
   }
 
-  // Serve uploaded images
   @Get('images/:filename')
   @ApiOperation({ summary: 'Get uploaded image' })
   getImage(

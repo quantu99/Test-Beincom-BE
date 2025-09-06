@@ -14,12 +14,15 @@ import { PostsQueryDto, UpdatePostDto } from './dto/update-post.dto';
 import { DraftsQueryDto } from './dto/draft-query.dto';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
+import { SupabaseService } from '@/subabase/supabase.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   async create(createPostDto: CreatePostDto, authorId: string): Promise<Post> {
@@ -119,9 +122,13 @@ export class PostsService {
     const oldImageUrl = draft.image;
 
     Object.assign(draft, updateDraftDto);
-    
+
     // If image is being updated and there was an old image, delete the old one
-    if (updateDraftDto.image && oldImageUrl && oldImageUrl !== updateDraftDto.image) {
+    if (
+      updateDraftDto.image &&
+      oldImageUrl &&
+      oldImageUrl !== updateDraftDto.image
+    ) {
       await this.deleteImageFile(oldImageUrl);
     }
 
@@ -155,12 +162,12 @@ export class PostsService {
 
   async discardDraft(id: string, authorId: string): Promise<void> {
     const draft = await this.getDraft(id, authorId);
-    
+
     // Delete associated image if exists
     if (draft.image) {
       await this.deleteImageFile(draft.image);
     }
-    
+
     await this.postsRepository.remove(draft);
   }
 
@@ -280,7 +287,11 @@ export class PostsService {
     Object.assign(post, updatePostDto);
 
     // If image is being updated and there was an old image, delete the old one
-    if (updatePostDto.image && oldImageUrl && oldImageUrl !== updatePostDto.image) {
+    if (
+      updatePostDto.image &&
+      oldImageUrl &&
+      oldImageUrl !== updatePostDto.image
+    ) {
       await this.deleteImageFile(oldImageUrl);
     }
 
@@ -343,5 +354,29 @@ export class PostsService {
       order: { publishedAt: 'DESC' },
       take: limit,
     });
+  }
+
+  async uploadImage(file: any) {
+    if (!file) throw new BadRequestException('No file uploaded');
+
+    const supabase = this.supabaseService.getClient();
+
+    const filename = `post-${Date.now()}-${uuidv4()}.${file.originalname.split('.').pop()}`;
+
+    const { error } = await supabase.storage
+      .from('posts') // bucket name
+      .upload(filename, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) throw new BadRequestException(error.message);
+
+    const { data } = supabase.storage.from('posts').getPublicUrl(filename);
+
+    return {
+      filename,
+      url: data.publicUrl,
+    };
   }
 }
