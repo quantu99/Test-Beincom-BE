@@ -12,8 +12,6 @@ import { CreateDraftDto } from './dto/create-draft.dto';
 import { PublishDraftDto, UpdateDraftDto } from './dto/update-draft.dto';
 import { PostsQueryDto, UpdatePostDto } from './dto/update-post.dto';
 import { DraftsQueryDto } from './dto/draft-query.dto';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
 import { SupabaseService } from '@/subabase/supabase.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -25,6 +23,7 @@ export class PostsService {
     private readonly supabaseService: SupabaseService,
   ) {}
 
+  // Original methods (keeping for backward compatibility)
   async create(createPostDto: CreatePostDto, authorId: string): Promise<Post> {
     const post = this.postsRepository.create({
       ...createPostDto,
@@ -35,15 +34,157 @@ export class PostsService {
     return this.postsRepository.save(post);
   }
 
-  async createDraft(
-    createDraftDto: CreateDraftDto,
+  // New method: Create post with image upload
+  async createWithImage(createPostDto: CreatePostDto, file: any, authorId: string): Promise<Post> {
+    let imageUrl: string | undefined;
+
+    // Upload image if provided
+    if (file) {
+      const uploadResult = await this.uploadImage(file);
+      imageUrl = uploadResult.url;
+    }
+
+    const post = this.postsRepository.create({
+      ...createPostDto,
+      image: imageUrl,
+      author: { id: authorId } as any,
+      publishedAt:
+        createPostDto.status === PostStatus.PUBLISHED ? new Date() : undefined,
+    });
+    
+    return this.postsRepository.save(post);
+  }
+
+  // New method: Update post with image upload
+  async updateWithImage(
+    id: string,
+    updatePostDto: UpdatePostDto,
+    file: any,
     authorId: string,
   ): Promise<Post> {
+    const post = await this.postsRepository.findOne({
+      where: {
+        id,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Published post with ID ${id} not found`);
+    }
+
+    if (post.authorId !== authorId) {
+      throw new ForbiddenException('You can only update your own posts');
+    }
+
+    const oldImageUrl = post.image;
+
+    // Upload new image if provided
+    if (file) {
+      const uploadResult = await this.uploadImage(file);
+      updatePostDto.image = uploadResult.url;
+    }
+
+    Object.assign(post, updatePostDto);
+
+    // Delete old image if a new one was uploaded
+    if (updatePostDto.image && oldImageUrl && oldImageUrl !== updatePostDto.image) {
+      await this.deleteSupabaseImage(oldImageUrl);
+    }
+
+    return this.postsRepository.save(post);
+  }
+
+  // Draft methods with image upload
+  async createDraft(createDraftDto: CreateDraftDto, authorId: string): Promise<Post> {
     const draft = this.postsRepository.create({
       ...createDraftDto,
       authorId,
       status: PostStatus.DRAFT,
     });
+    return this.postsRepository.save(draft);
+  }
+
+  // New method: Create draft with image upload
+  async createDraftWithImage(
+    createDraftDto: CreateDraftDto,
+    file: any,
+    authorId: string,
+  ): Promise<Post> {
+    let imageUrl: string | undefined;
+
+    // Upload image if provided
+    if (file) {
+      const uploadResult = await this.uploadImage(file);
+      imageUrl = uploadResult.url;
+    }
+
+    const draft = this.postsRepository.create({
+      ...createDraftDto,
+      image: imageUrl,
+      authorId,
+      status: PostStatus.DRAFT,
+    });
+    
+    return this.postsRepository.save(draft);
+  }
+
+  // New method: Update draft with image upload
+  async updateDraftWithImage(
+    id: string,
+    updateDraftDto: UpdateDraftDto,
+    file: any,
+    authorId: string,
+  ): Promise<Post> {
+    const draft = await this.getDraft(id, authorId);
+    const oldImageUrl = draft.image;
+
+    // Upload new image if provided
+    if (file) {
+      const uploadResult = await this.uploadImage(file);
+      updateDraftDto.image = uploadResult.url;
+    }
+
+    Object.assign(draft, updateDraftDto);
+
+    // Delete old image if a new one was uploaded
+    if (updateDraftDto.image && oldImageUrl && oldImageUrl !== updateDraftDto.image) {
+      await this.deleteSupabaseImage(oldImageUrl);
+    }
+
+    return this.postsRepository.save(draft);
+  }
+
+  // New method: Publish draft with image upload
+  async publishDraftWithImage(
+    id: string,
+    publishDraftDto: PublishDraftDto,
+    file: any,
+    authorId: string,
+  ): Promise<Post> {
+    const draft = await this.getDraft(id, authorId);
+    const oldImageUrl = draft.image;
+
+    // Upload new image if provided
+    if (file) {
+      const uploadResult = await this.uploadImage(file);
+      publishDraftDto.image = uploadResult.url;
+    }
+
+    // Update with any final changes before publishing
+    if (publishDraftDto.title) draft.title = publishDraftDto.title;
+    if (publishDraftDto.content) draft.content = publishDraftDto.content;
+    if (publishDraftDto.image) {
+      // Delete old image if a new one was uploaded
+      if (oldImageUrl && oldImageUrl !== publishDraftDto.image) {
+        await this.deleteSupabaseImage(oldImageUrl);
+      }
+      draft.image = publishDraftDto.image;
+    }
+
+    draft.status = PostStatus.PUBLISHED;
+    draft.publishedAt = new Date();
+
     return this.postsRepository.save(draft);
   }
 
@@ -70,7 +211,6 @@ export class PostsService {
       .where('post.authorId = :authorId', { authorId })
       .andWhere('post.status = :status', { status: PostStatus.DRAFT });
 
-    // Search functionality for drafts
     if (search) {
       queryBuilder.andWhere(
         '(post.title ILIKE :search OR post.content ILIKE :search)',
@@ -78,10 +218,8 @@ export class PostsService {
       );
     }
 
-    // Sorting
     queryBuilder.orderBy(`post.${sortBy}`, sortOrder as 'ASC' | 'DESC');
 
-    // Pagination
     const offset = (page - 1) * limit;
     queryBuilder.skip(offset).take(limit);
 
@@ -123,13 +261,13 @@ export class PostsService {
 
     Object.assign(draft, updateDraftDto);
 
-    // If image is being updated and there was an old image, delete the old one
+    // If image URL is being updated and there was an old image, delete the old one
     if (
       updateDraftDto.image &&
       oldImageUrl &&
       oldImageUrl !== updateDraftDto.image
     ) {
-      await this.deleteImageFile(oldImageUrl);
+      await this.deleteSupabaseImage(oldImageUrl);
     }
 
     return this.postsRepository.save(draft);
@@ -147,9 +285,9 @@ export class PostsService {
     if (publishDraftDto.title) draft.title = publishDraftDto.title;
     if (publishDraftDto.content) draft.content = publishDraftDto.content;
     if (publishDraftDto.image) {
-      // If image is being updated, delete the old one
+      // If image URL is being updated, delete the old one
       if (oldImageUrl && oldImageUrl !== publishDraftDto.image) {
-        await this.deleteImageFile(oldImageUrl);
+        await this.deleteSupabaseImage(oldImageUrl);
       }
       draft.image = publishDraftDto.image;
     }
@@ -165,22 +303,39 @@ export class PostsService {
 
     // Delete associated image if exists
     if (draft.image) {
-      await this.deleteImageFile(draft.image);
+      await this.deleteSupabaseImage(draft.image);
     }
 
     await this.postsRepository.remove(draft);
   }
 
-  private async deleteImageFile(imageUrl: string): Promise<void> {
+  // Helper method to delete image from Supabase
+  private async deleteSupabaseImage(imageUrl: string): Promise<void> {
     try {
-      const filename = imageUrl.split('/').pop();
+      const supabase = this.supabaseService.getClient();
+      
+      // Extract filename from URL
+      // URL format: https://[project].supabase.co/storage/v1/object/public/posts/filename
+      const urlParts = imageUrl.split('/');
+      const filename = urlParts[urlParts.length - 1];
+      
       if (filename) {
-        const filePath = join(process.cwd(), 'uploads/posts', filename);
-        await unlink(filePath);
+        const { error } = await supabase.storage
+          .from('posts')
+          .remove([filename]);
+          
+        if (error) {
+          console.warn('Failed to delete image from Supabase:', error.message);
+        }
       }
     } catch (error) {
-      console.warn('Failed to delete image file:', error.message);
+      console.warn('Failed to delete image from Supabase:', error.message);
     }
+  }
+
+  // Keep old method for backward compatibility
+  private async deleteImageFile(imageUrl: string): Promise<void> {
+    await this.deleteSupabaseImage(imageUrl);
   }
 
   async findAll(query: PostsQueryDto): Promise<{
@@ -196,7 +351,7 @@ export class PostsService {
       search,
       sortBy = 'publishedAt',
       sortOrder = 'DESC',
-      status = PostStatus.PUBLISHED, // Default to published posts only
+      status = PostStatus.PUBLISHED,
     } = query;
 
     const queryBuilder = this.postsRepository
@@ -206,7 +361,6 @@ export class PostsService {
       .leftJoinAndSelect('comments.author', 'commentAuthor')
       .where('post.status = :status', { status });
 
-    // Search functionality
     if (search) {
       queryBuilder.andWhere(
         '(post.title ILIKE :search OR post.content ILIKE :search)',
@@ -214,7 +368,6 @@ export class PostsService {
       );
     }
 
-    // Sorting - handle publishedAt for published posts
     if (sortBy === 'comments') {
       queryBuilder
         .addSelect('COUNT(comments.id)', 'commentCount')
@@ -226,7 +379,6 @@ export class PostsService {
       queryBuilder.orderBy(`post.${sortBy}`, sortOrder as 'ASC' | 'DESC');
     }
 
-    // Pagination
     const offset = (page - 1) * limit;
     queryBuilder.skip(offset).take(limit);
 
@@ -286,13 +438,13 @@ export class PostsService {
 
     Object.assign(post, updatePostDto);
 
-    // If image is being updated and there was an old image, delete the old one
+    // If image URL is being updated and there was an old image, delete the old one
     if (
       updatePostDto.image &&
       oldImageUrl &&
       oldImageUrl !== updatePostDto.image
     ) {
-      await this.deleteImageFile(oldImageUrl);
+      await this.deleteSupabaseImage(oldImageUrl);
     }
 
     return this.postsRepository.save(post);
@@ -316,7 +468,7 @@ export class PostsService {
 
     // Delete associated image if exists
     if (post.image) {
-      await this.deleteImageFile(post.image);
+      await this.deleteSupabaseImage(post.image);
     }
 
     await this.postsRepository.remove(post);
@@ -364,7 +516,7 @@ export class PostsService {
     const filename = `post-${Date.now()}-${uuidv4()}.${file.originalname.split('.').pop()}`;
 
     const { error } = await supabase.storage
-      .from('posts') // bucket name
+      .from('posts')
       .upload(filename, file.buffer, {
         contentType: file.mimetype,
         upsert: false,

@@ -35,13 +35,30 @@ import { DraftsQueryDto } from './dto/draft-query.dto';
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-
+  // Option 1: Create post with image upload in single request
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new post (can be draft or published)' })
-  create(@Body() createPostDto: CreatePostDto, @Request() req) {
-    return this.postsService.create(createPostDto, req.user.id);
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create post with optional image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        status: { type: 'string', enum: ['draft', 'published'] },
+        image: { type: 'string', format: 'binary' },
+      },
+      required: ['title', 'content'],
+    },
+  })
+  @ApiOperation({ summary: 'Create a new post (can be draft or published) with optional image' })
+  async create(@Body() createPostDto: CreatePostDto, @UploadedFile() file: any, @Request() req) {
+    return this.postsService.createWithImage(createPostDto, file, req.user.id);
   }
 
   @Get()
@@ -73,13 +90,30 @@ export class PostsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update published post' })
-  update(
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update post with optional image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        status: { type: 'string', enum: ['draft', 'published'] },
+        image: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Update published post with optional image' })
+  async update(
     @Param('id') id: string,
     @Body() updatePostDto: UpdatePostDto,
+    @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.update(id, updatePostDto, req.user.id);
+    return this.postsService.updateWithImage(id, updatePostDto, file, req.user.id);
   }
 
   @Post(':id/like')
@@ -99,13 +133,29 @@ export class PostsController {
     return this.postsService.remove(id, req.user.id);
   }
 
-
+  // DRAFT ENDPOINTS
   @Post('drafts')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new draft' })
-  createDraft(@Body() createDraftDto: CreateDraftDto, @Request() req) {
-    return this.postsService.createDraft(createDraftDto, req.user.id);
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create draft with optional image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        image: { type: 'string', format: 'binary' },
+      },
+      required: ['title', 'content'],
+    },
+  })
+  @ApiOperation({ summary: 'Create a new draft with optional image' })
+  async createDraft(@Body() createDraftDto: CreateDraftDto, @UploadedFile() file: any, @Request() req) {
+    return this.postsService.createDraftWithImage(createDraftDto, file, req.user.id);
   }
 
   @Get('drafts')
@@ -127,25 +177,57 @@ export class PostsController {
   @Patch('drafts/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update draft' })
-  updateDraft(
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update draft with optional image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        image: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Update draft with optional image' })
+  async updateDraft(
     @Param('id') id: string,
     @Body() updateDraftDto: UpdateDraftDto,
+    @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.updateDraft(id, updateDraftDto, req.user.id);
+    return this.postsService.updateDraftWithImage(id, updateDraftDto, file, req.user.id);
   }
 
   @Post('drafts/:id/publish')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Publish a draft' })
-  publishDraft(
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Publish draft with optional image update',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        content: { type: 'string' },
+        image: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Publish a draft with optional image update' })
+  async publishDraft(
     @Param('id') id: string,
     @Body() publishDraftDto: PublishDraftDto,
+    @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.publishDraft(id, publishDraftDto, req.user.id);
+    return this.postsService.publishDraftWithImage(id, publishDraftDto, file, req.user.id);
   }
 
   @Delete('drafts/:id')
@@ -157,7 +239,7 @@ export class PostsController {
     return this.postsService.discardDraft(id, req.user.id);
   }
 
-
+  // Keep separate upload endpoint for cases where you need to upload image first
   @Post('upload-image')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -181,7 +263,7 @@ export class PostsController {
       },
     },
   })
-  @ApiOperation({ summary: 'Upload image to Supabase storage' })
+  @ApiOperation({ summary: 'Upload image to Supabase storage (standalone)' })
   async uploadImage(@UploadedFile() file: any) {
     return this.postsService.uploadImage(file);
   }
