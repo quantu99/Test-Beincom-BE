@@ -13,8 +13,7 @@ import { DatabaseModule } from './database/database.module';
 import { User } from './modules/users/entities/user.entity';
 import { Post } from './modules/posts/entities/post.entity';
 import { Comment } from './modules/comments/entities/comment.entity';
-import { SubabaseModule } from './subabase/subabase.module';
-
+import { SupabaseModule } from './subabase/subabase.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,15 +24,16 @@ import { SubabaseModule } from './subabase/subabase.module';
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
         console.log('Database URL:', databaseUrl); // Debug log
-        
+
         return {
           type: 'postgres',
           url: databaseUrl,
           entities: [User, Post, Comment],
           synchronize: configService.get('NODE_ENV') !== 'production',
-          ssl: configService.get('NODE_ENV') === 'production' 
-            ? { rejectUnauthorized: false }
-            : false,
+          ssl:
+            configService.get('NODE_ENV') === 'production'
+              ? { rejectUnauthorized: false }
+              : false,
           logging: configService.get('NODE_ENV') === 'development',
           autoLoadEntities: true,
         };
@@ -56,7 +56,7 @@ import { SubabaseModule } from './subabase/subabase.module';
     PostsModule,
     CommentsModule,
     DatabaseModule,
-    SubabaseModule,
+    SupabaseModule,
   ],
 })
 export class AppModule {}
