@@ -182,7 +182,7 @@ export class PostsController {
     },
   })
   @ApiOperation({ summary: 'Upload image to Supabase storage' })
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: any) {
     return this.postsService.uploadImage(file);
   }
 }
