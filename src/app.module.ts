@@ -15,6 +15,7 @@ import { Post } from './modules/posts/entities/post.entity';
 import { Comment } from './modules/comments/entities/comment.entity';
 import { SupabaseModule } from './subabase/subabase.module';
 import { PostLike } from './modules/posts/entities/post-like.entity';
+import { SearchModule } from './modules/search/search.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -56,6 +57,7 @@ import { PostLike } from './modules/posts/entities/post-like.entity';
     CommentsModule,
     DatabaseModule,
     SupabaseModule,
+    SearchModule,
   ],
 })
 export class AppModule {}
