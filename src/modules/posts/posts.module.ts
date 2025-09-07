@@ -6,10 +6,11 @@ import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { SupabaseModule } from '@/subabase/subabase.module';
 import { memoryStorage } from 'multer';
+import { PostLike } from './entities/post-like.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post]),
+    TypeOrmModule.forFeature([Post, PostLike]),
     MulterModule.register({
       storage: memoryStorage(),
       fileFilter: (req, file, callback) => {

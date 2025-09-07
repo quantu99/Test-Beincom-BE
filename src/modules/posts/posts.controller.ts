@@ -39,9 +39,11 @@ export class PostsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Create post with optional image',
@@ -56,8 +58,15 @@ export class PostsController {
       required: ['title', 'content'],
     },
   })
-  @ApiOperation({ summary: 'Create a new post (can be draft or published) with optional image' })
-  async create(@Body() createPostDto: CreatePostDto, @UploadedFile() file: any, @Request() req) {
+  @ApiOperation({
+    summary:
+      'Create a new post (can be draft or published) with optional image',
+  })
+  async create(
+    @Body() createPostDto: CreatePostDto,
+    @UploadedFile() file: any,
+    @Request() req,
+  ) {
     return this.postsService.createWithImage(createPostDto, file, req.user.id);
   }
 
@@ -90,9 +99,11 @@ export class PostsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Update post with optional image',
@@ -113,7 +124,12 @@ export class PostsController {
     @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.updateWithImage(id, updatePostDto, file, req.user.id);
+    return this.postsService.updateWithImage(
+      id,
+      updatePostDto,
+      file,
+      req.user.id,
+    );
   }
 
   @Post(':id/like')
@@ -137,9 +153,11 @@ export class PostsController {
   @Post('drafts')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Create draft with optional image',
@@ -154,8 +172,16 @@ export class PostsController {
     },
   })
   @ApiOperation({ summary: 'Create a new draft with optional image' })
-  async createDraft(@Body() createDraftDto: CreateDraftDto, @UploadedFile() file: any, @Request() req) {
-    return this.postsService.createDraftWithImage(createDraftDto, file, req.user.id);
+  async createDraft(
+    @Body() createDraftDto: CreateDraftDto,
+    @UploadedFile() file: any,
+    @Request() req,
+  ) {
+    return this.postsService.createDraftWithImage(
+      createDraftDto,
+      file,
+      req.user.id,
+    );
   }
 
   @Get('drafts')
@@ -177,9 +203,11 @@ export class PostsController {
   @Patch('drafts/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Update draft with optional image',
@@ -199,15 +227,22 @@ export class PostsController {
     @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.updateDraftWithImage(id, updateDraftDto, file, req.user.id);
+    return this.postsService.updateDraftWithImage(
+      id,
+      updateDraftDto,
+      file,
+      req.user.id,
+    );
   }
 
   @Post('drafts/:id/publish')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('image', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  }))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Publish draft with optional image update',
@@ -227,7 +262,12 @@ export class PostsController {
     @UploadedFile() file: any,
     @Request() req,
   ) {
-    return this.postsService.publishDraftWithImage(id, publishDraftDto, file, req.user.id);
+    return this.postsService.publishDraftWithImage(
+      id,
+      publishDraftDto,
+      file,
+      req.user.id,
+    );
   }
 
   @Delete('drafts/:id')
@@ -266,5 +306,21 @@ export class PostsController {
   @ApiOperation({ summary: 'Upload image to Supabase storage (standalone)' })
   async uploadImage(@UploadedFile() file: any) {
     return this.postsService.uploadImage(file);
+  }
+  // Thêm vào PostsController
+  @Get(':id/like-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if user has liked a post' })
+  getLikeStatus(@Param('id') id: string, @Request() req) {
+    return this.postsService.hasUserLikedPost(id, req.user.id);
+  }
+
+  @Post(':id/toggle-like')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle like/unlike a post' })
+  toggleLike(@Param('id') id: string, @Request() req) {
+    return this.postsService.toggleLike(id, req.user.id);
   }
 }

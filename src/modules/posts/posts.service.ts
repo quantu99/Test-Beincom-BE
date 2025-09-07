@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post, PostStatus } from './entities/post.entity';
+import { PostLike } from './entities/post-like.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateDraftDto } from './dto/create-draft.dto';
 import { PublishDraftDto, UpdateDraftDto } from './dto/update-draft.dto';
@@ -15,20 +21,30 @@ export class PostsService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    @InjectRepository(PostLike)
+    private postLikesRepository: Repository<PostLike>,
     private readonly supabaseService: SupabaseService,
   ) {}
 
   // Validate file type and size
   private validateFile(file: any): void {
     if (!file) return;
-    
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ];
     const maxSize = 5 * 1024 * 1024; // 5MB
-    
+
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Only image files (JPEG, PNG, WebP, GIF) are allowed');
+      throw new BadRequestException(
+        'Only image files (JPEG, PNG, WebP, GIF) are allowed',
+      );
     }
-    
+
     if (file.size > maxSize) {
       throw new BadRequestException('File size must be less than 5MB');
     }
@@ -39,63 +55,68 @@ export class PostsService {
     if (originalName && originalName.includes('.')) {
       return originalName.split('.').pop()?.toLowerCase() || 'jpg';
     }
-    
+
     const mimeTypeMap: { [key: string]: string } = {
       'image/jpeg': 'jpg',
       'image/jpg': 'jpg',
       'image/png': 'png',
       'image/webp': 'webp',
-      'image/gif': 'gif'
+      'image/gif': 'gif',
     };
-    
+
     return mimeTypeMap[mimetype] || 'jpg';
   }
 
   // Upload image to Supabase with proper error handling
   async uploadImage(file: any) {
     if (!file) throw new BadRequestException('No file uploaded');
-    
+
     // Validate file
     this.validateFile(file);
-    
+
     const supabase = this.supabaseService.getClient();
-    const fileExtension = this.getFileExtension(file.originalname, file.mimetype);
+    const fileExtension = this.getFileExtension(
+      file.originalname,
+      file.mimetype,
+    );
     const filename = `post-${Date.now()}-${uuidv4()}.${fileExtension}`;
-    
+
     try {
       // Ensure we have the buffer
       const fileBuffer = file.buffer || file;
-      
+
       if (!fileBuffer || !Buffer.isBuffer(fileBuffer)) {
         throw new BadRequestException('Invalid file buffer');
       }
-      
-      console.log(`Uploading file: ${filename}, size: ${fileBuffer.length}, type: ${file.mimetype}`);
-      
+
+      console.log(
+        `Uploading file: ${filename}, size: ${fileBuffer.length}, type: ${file.mimetype}`,
+      );
+
       const { data, error } = await supabase.storage
         .from('posts')
         .upload(filename, fileBuffer, {
           contentType: file.mimetype,
           upsert: false,
-          cacheControl: '3600'
+          cacheControl: '3600',
         });
-      
+
       if (error) {
         console.error('Supabase upload error:', error);
         throw new BadRequestException(`Upload failed: ${error.message}`);
       }
-      
+
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('posts')
         .getPublicUrl(filename);
-      
+
       console.log(`File uploaded successfully: ${urlData.publicUrl}`);
-      
+
       return {
         filename,
         url: urlData.publicUrl,
-        path: data.path
+        path: data.path,
       };
     } catch (error) {
       console.error('Upload error:', error);
@@ -104,21 +125,26 @@ export class PostsService {
   }
 
   // Create post with image upload
-  async createWithImage(createPostDto: CreatePostDto, file: any, authorId: string): Promise<Post> {
+  async createWithImage(
+    createPostDto: CreatePostDto,
+    file: any,
+    authorId: string,
+  ): Promise<Post> {
     let imageUrl: string | undefined;
-    
+
     if (file) {
       const uploadResult = await this.uploadImage(file);
       imageUrl = uploadResult.url;
     }
-    
+
     const post = this.postsRepository.create({
       ...createPostDto,
       image: imageUrl,
       author: { id: authorId } as any,
-      publishedAt: createPostDto.status === PostStatus.PUBLISHED ? new Date() : undefined,
+      publishedAt:
+        createPostDto.status === PostStatus.PUBLISHED ? new Date() : undefined,
     });
-    
+
     return this.postsRepository.save(post);
   }
 
@@ -152,7 +178,11 @@ export class PostsService {
     Object.assign(post, updatePostDto);
 
     // Delete old image if a new one was uploaded
-    if (updatePostDto.image && oldImageUrl && oldImageUrl !== updatePostDto.image) {
+    if (
+      updatePostDto.image &&
+      oldImageUrl &&
+      oldImageUrl !== updatePostDto.image
+    ) {
       await this.deleteSupabaseImage(oldImageUrl);
     }
 
@@ -199,7 +229,11 @@ export class PostsService {
 
     Object.assign(draft, updateDraftDto);
 
-    if (updateDraftDto.image && oldImageUrl && oldImageUrl !== updateDraftDto.image) {
+    if (
+      updateDraftDto.image &&
+      oldImageUrl &&
+      oldImageUrl !== updateDraftDto.image
+    ) {
       await this.deleteSupabaseImage(oldImageUrl);
     }
 
@@ -240,16 +274,16 @@ export class PostsService {
   private async deleteSupabaseImage(imageUrl: string): Promise<void> {
     try {
       const supabase = this.supabaseService.getClient();
-      
+
       // Extract filename from URL
       const urlParts = imageUrl.split('/');
       const filename = urlParts[urlParts.length - 1];
-      
+
       if (filename) {
         const { error } = await supabase.storage
           .from('posts')
           .remove([filename]);
-          
+
         if (error) {
           console.warn('Failed to delete image from Supabase:', error.message);
         } else {
@@ -261,13 +295,23 @@ export class PostsService {
     }
   }
 
-  // ... rest of your existing methods remain the same ...
-
   async getUserDrafts(
     query: DraftsQueryDto,
     authorId: string,
-  ): Promise<{ drafts: Post[]; total: number; page: number; limit: number; totalPages: number; }> {
-    const { page = 1, limit = 10, search, sortBy = 'updatedAt', sortOrder = 'DESC' } = query;
+  ): Promise<{
+    drafts: Post[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy = 'updatedAt',
+      sortOrder = 'DESC',
+    } = query;
 
     const queryBuilder = this.postsRepository
       .createQueryBuilder('post')
@@ -430,19 +474,75 @@ export class PostsService {
     return this.createWithImage(createPostDto, null, authorId);
   }
 
-  async update(id: string, updatePostDto: UpdatePostDto, authorId: string): Promise<Post> {
+  async update(
+    id: string,
+    updatePostDto: UpdatePostDto,
+    authorId: string,
+  ): Promise<Post> {
     return this.updateWithImage(id, updatePostDto, null, authorId);
   }
 
-  async createDraft(createDraftDto: CreateDraftDto, authorId: string): Promise<Post> {
+  async createDraft(
+    createDraftDto: CreateDraftDto,
+    authorId: string,
+  ): Promise<Post> {
     return this.createDraftWithImage(createDraftDto, null, authorId);
   }
 
-  async updateDraft(id: string, updateDraftDto: UpdateDraftDto, authorId: string): Promise<Post> {
+  async updateDraft(
+    id: string,
+    updateDraftDto: UpdateDraftDto,
+    authorId: string,
+  ): Promise<Post> {
     return this.updateDraftWithImage(id, updateDraftDto, null, authorId);
   }
 
-  async publishDraft(id: string, publishDraftDto: PublishDraftDto, authorId: string): Promise<Post> {
+  async publishDraft(
+    id: string,
+    publishDraftDto: PublishDraftDto,
+    authorId: string,
+  ): Promise<Post> {
     return this.publishDraftWithImage(id, publishDraftDto, null, authorId);
+  }
+
+  // Check if user has liked a post
+  async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
+    const like = await this.postLikesRepository.findOne({
+      where: { postId, userId },
+    });
+    return !!like;
+  }
+
+  // Toggle like/unlike
+  async toggleLike(
+    postId: string,
+    userId: string,
+  ): Promise<{ post: Post; isLiked: boolean }> {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId, status: PostStatus.PUBLISHED },
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Published post with ID ${postId} not found`);
+    }
+
+    const existingLike = await this.postLikesRepository.findOne({
+      where: { postId, userId },
+    });
+
+    if (existingLike) {
+      // Unlike
+      await this.postLikesRepository.remove(existingLike);
+      post.likes = Math.max(0, post.likes - 1);
+      await this.postsRepository.save(post);
+      return { post, isLiked: false };
+    } else {
+      // Like
+      const newLike = this.postLikesRepository.create({ postId, userId });
+      await this.postLikesRepository.save(newLike);
+      post.likes += 1;
+      await this.postsRepository.save(post);
+      return { post, isLiked: true };
+    }
   }
 }
