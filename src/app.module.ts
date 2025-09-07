@@ -14,6 +14,7 @@ import { User } from './modules/users/entities/user.entity';
 import { Post } from './modules/posts/entities/post.entity';
 import { Comment } from './modules/comments/entities/comment.entity';
 import { SupabaseModule } from './subabase/subabase.module';
+import { PostLike } from './modules/posts/entities/post-like.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,7 +27,7 @@ import { SupabaseModule } from './subabase/subabase.module';
         return {
           type: 'postgres',
           url: databaseUrl,
-          entities: [User, Post, Comment],
+          entities: [User, Post, Comment, PostLike],
           synchronize: configService.get('NODE_ENV') !== 'production',
           ssl:
             configService.get('NODE_ENV') === 'production'
