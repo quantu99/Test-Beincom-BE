@@ -54,10 +54,10 @@ async function bootstrap() {
     const port = process.env.PORT || 3001;
     await app.listen(port, '0.0.0.0');
 
-    logger.log(`🚀 Application is running on port: ${port}`);
+    logger.log(`Application is running on port: ${port}`);
 
     if (process.env.NODE_ENV !== 'production') {
-      logger.log(`📚 API Documentation: http://localhost:${port}/api`);
+      logger.log(`API Documentation: http://localhost:${port}/api`);
     }
 
     if (process.env.NODE_ENV === 'production') {
@@ -95,7 +95,7 @@ function setupKeepAlive() {
 
       if (response.ok) {
         logger.log(
-          `✅ Keep-alive ping successful: ${response.status} at ${new Date().toISOString()}`,
+          `Keep-alive ping successful: ${response.status} at ${new Date().toISOString()}`,
         );
         retryCount = 0;
       } else {
@@ -104,12 +104,12 @@ function setupKeepAlive() {
     } catch (error) {
       retryCount++;
       logger.warn(
-        `⚠️ Keep-alive ping failed (attempt ${retryCount}/${MAX_RETRIES}): ${error.message}`,
+        `Keep-alive ping failed (attempt ${retryCount}/${MAX_RETRIES}): ${error.message}`,
       );
 
       if (retryCount >= MAX_RETRIES) {
         logger.error(
-          '❌ Max keep-alive retries reached. Service may be unhealthy.',
+          'Max keep-alive retries reached. Service may be unhealthy.',
         );
         retryCount = 0;
       }
@@ -120,26 +120,26 @@ function setupKeepAlive() {
 
   setInterval(keepAlive, PING_INTERVAL);
 
-  logger.log('🔄 Keep-alive service started - will ping every 8 minutes');
+  logger.log('Keep-alive service started - will ping every 8 minutes');
 }
 
 process.on('SIGINT', () => {
-  logger.log('📴 Received SIGINT. Graceful shutdown...');
+  logger.log('Received SIGINT. Graceful shutdown...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  logger.log('📴 Received SIGTERM. Graceful shutdown...');
+  logger.log('Received SIGTERM. Graceful shutdown...');
   process.exit(0);
 });
 
 process.on('uncaughtException', (error) => {
-  logger.error('💥 Uncaught Exception:', error);
+  logger.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('🚫 Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
