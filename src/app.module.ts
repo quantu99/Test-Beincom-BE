@@ -14,6 +14,8 @@ import { SupabaseModule } from './subabase/subabase.module';
 import { User } from './modules/users/entities/user.entity';
 import { Post } from './modules/posts/entities/post.entity';
 import { Comment } from './modules/comments/entities/comment.entity';
+import { SearchModule } from './modules/search/search.module';
+import { PostLike } from './modules/posts/entities/post-like.entity';
 
 @Module({
   imports: [
@@ -26,11 +28,11 @@ import { Comment } from './modules/comments/entities/comment.entity';
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
         const isProduction = configService.get('NODE_ENV') === 'production';
-
+        
         return {
           type: 'postgres',
           url: databaseUrl,
-          entities: [User, Post, Comment],
+          entities: [User, Post, Comment, PostLike],
           synchronize: !isProduction,
           ssl: isProduction ? { rejectUnauthorized: false } : false,
           logging: configService.get('NODE_ENV') === 'development',
@@ -64,6 +66,7 @@ import { Comment } from './modules/comments/entities/comment.entity';
     CommentsModule,
     DatabaseModule,
     SupabaseModule,
+    SearchModule
   ],
 })
 export class AppModule {}
